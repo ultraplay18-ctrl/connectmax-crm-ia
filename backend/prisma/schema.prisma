@@ -1,0 +1,1216 @@
+// ConnectMax CRM IA - Prisma Schema (SQLite Local Development)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id        String   @id @default(uuid())
+  name      String
+  document  String   @unique // CNPJ
+  email     String
+  phone     String?
+  status    String   @default("ACTIVE")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users                 User[]
+  settings              CompanySettings?
+  auditLogs             AuditLog[]
+  contacts              Contact[]
+  leads                 Lead[]
+  tasks                 Task[]
+  interactions          Interaction[]
+  events                Event[]
+  aiInsights            AiInsight[]
+  conversations         Conversation[]
+  receivables           FinancialReceivable[]
+  payables              FinancialPayable[]
+  subscription          Subscription?
+  paymentHistories      PaymentHistory[]
+  supportTickets        SupportTicket[]
+  subscriptionHistories SubscriptionHistory[]
+  aiAgents              AiAgent[]
+  knowledgeBases        KnowledgeBase[]
+  agentExecutions       AgentExecution[]
+  agentLogs             AgentLog[]
+  aiWorkflows           AiWorkflow[]
+  mcpServers            McpServer[]
+  featureFlags          CompanyFeatureFlag[]
+  knowledgeLibraries    KnowledgeLibrary[]
+  knowledgeCategories   KnowledgeCategory[]
+  knowledgeTags         KnowledgeTag[]
+  memoryProfiles        MemoryProfile[]
+  playgroundSessions    PlaygroundSession[]
+  playgroundPresets     PlaygroundPreset[]
+  companySecrets        CompanySecret[]
+  companyProviders      CompanyProvider[]
+  companyProviderModels CompanyProviderModel[]
+  companyFallbackChains CompanyFallbackChain[]
+  secretAuditLogs       SecretAuditLog[]
+
+  @@map("companies")
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique // SUPER_ADMIN, COMPANY_ADMIN, EMPLOYEE
+  description String?
+  permissions String?  // Permissões em formato JSON string
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users User[]
+
+  @@map("roles")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  companyId String
+  roleId    String
+  name      String
+  email     String   @unique
+  password  String
+  status    String   @default("ACTIVE")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company               Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  role                  Role            @relation(fields: [roleId], references: [id])
+  sessions              Session[]
+  auditLogs             AuditLog[]
+  assignedLeads         Lead[]
+  assignedTasks         Task[]
+  interactions          Interaction[]
+  assignedEvents        Event[]
+  aiInsights            AiInsight[]
+  assignedConversations Conversation[]
+  tickets               SupportTicket[]
+  ticketMessages        TicketMessage[]
+  responsibleAiAgents   AiAgent[]
+
+  @@index([companyId])
+  @@index([email])
+  @@map("users")
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  userId       String
+  refreshToken String   @unique
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model CompanySettings {
+  id                  String   @id @default(uuid())
+  companyId           String   @unique
+  logo                String?
+  primaryColor        String   @default("#2563EB")
+  timezone            String   @default("America/Sao_Paulo")
+  onboardingCompleted Boolean  @default(false)
+  onboardingProgress  Int      @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("company_settings")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  companyId String?
+  userId    String?
+  action    String
+  entity    String
+  entityId  String?
+  payload   String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  company Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([userId])
+  @@map("audit_logs")
+}
+
+model Contact {
+  id          String   @id @default(uuid())
+  companyId   String
+  name        String
+  email       String?
+  phone       String?
+  document    String?
+  type        String   @default("INDIVIDUAL")
+  companyName String?
+  position    String?
+  notes       String?
+  status      String   @default("ACTIVE")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company       Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  leads         Lead[]
+  tasks         Task[]
+  interactions  Interaction[]
+  events        Event[]
+  conversations Conversation[]
+  receivables   FinancialReceivable[]
+
+  @@index([companyId])
+  @@index([email])
+  @@map("contacts")
+}
+
+model Lead {
+  id             String    @id @default(uuid())
+  companyId      String
+  contactId      String?
+  assignedUserId String?
+  title          String
+  source         String?
+  status         String    @default("NEW_LEAD")
+  value          Float     @default(0.0)
+  notes          String?
+  aiScore        String?
+  aiReasoning    String?
+  aiScoreDate    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  company      Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contact      Contact?              @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  assignedUser User?                 @relation(fields: [assignedUserId], references: [id], onDelete: SetNull)
+  tasks        Task[]
+  interactions Interaction[]
+  events       Event[]
+  receivables  FinancialReceivable[]
+
+  @@index([companyId])
+  @@index([contactId])
+  @@index([assignedUserId])
+  @@map("leads")
+}
+
+model Task {
+  id             String   @id @default(uuid())
+  companyId      String
+  contactId      String?
+  leadId         String?
+  assignedUserId String?
+  title          String
+  description    String?
+  dueDate        DateTime
+  priority       String   @default("MEDIUM")
+  status         String   @default("PENDING")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contact      Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  lead         Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  assignedUser User?    @relation(fields: [assignedUserId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([assignedUserId])
+  @@map("tasks")
+}
+
+model Interaction {
+  id          String   @id @default(uuid())
+  companyId   String
+  contactId   String?
+  leadId      String?
+  userId      String?
+  type        String   @default("NOTE")
+  title       String
+  description String?
+  createdAt   DateTime @default(now())
+
+  company Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contact Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  lead    Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([contactId])
+  @@index([leadId])
+  @@map("interactions")
+}
+
+model Event {
+  id             String   @id @default(uuid())
+  companyId      String
+  contactId      String?
+  leadId         String?
+  assignedUserId String?
+  title          String
+  description    String?
+  startDate      DateTime
+  endDate        DateTime
+  location       String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contact      Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  lead         Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  assignedUser User?    @relation(fields: [assignedUserId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([assignedUserId])
+  @@map("events")
+}
+
+model AiInsight {
+  id        String   @id @default(uuid())
+  companyId String
+  userId    String
+  type      String
+  targetId  String?
+  prompt    String
+  response  String
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([userId])
+  @@map("ai_insights")
+}
+
+model Conversation {
+  id             String   @id @default(uuid())
+  companyId      String
+  contactId      String?
+  assignedUserId String?
+  phone          String
+  status         String   @default("AI_ATTENDING")
+  intent         String?
+  lastMessageAt  DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  company      Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contact      Contact?  @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  assignedUser User?     @relation(fields: [assignedUserId], references: [id], onDelete: SetNull)
+  messages     Message[]
+
+  @@index([companyId])
+  @@index([phone])
+  @@map("conversations")
+}
+
+model Message {
+  id             String   @id @default(uuid())
+  conversationId String
+  senderType     String   @default("CLIENT")
+  senderName     String?
+  content        String
+  suggestedReply String?
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@map("messages")
+}
+
+model FinancialReceivable {
+  id          String    @id @default(uuid())
+  companyId   String
+  contactId   String?
+  leadId      String?
+  description String
+  amount      Float
+  dueDate     DateTime
+  paymentDate DateTime?
+  status      String    @default("PENDING")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  company Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contact Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  lead    Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([contactId])
+  @@map("financial_receivables")
+}
+
+model FinancialPayable {
+  id          String    @id @default(uuid())
+  companyId   String
+  supplier    String
+  category    String
+  description String
+  amount      Float
+  dueDate     DateTime
+  paymentDate DateTime?
+  status      String    @default("PENDING")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@map("financial_payables")
+}
+
+model Plan {
+  id           String   @id @default(uuid())
+  name         String   @unique
+  price        Float
+  billingCycle String   @default("MONTHLY")
+  maxUsers     Int      @default(3)
+  maxContacts  Int      @default(500)
+  features     String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  subscriptions         Subscription[]
+  subscriptionHistories SubscriptionHistory[]
+
+  @@map("plans")
+}
+
+model Subscription {
+  id                     String    @id @default(uuid())
+  companyId              String    @unique
+  planId                 String
+  status                 String    @default("TRIALING")
+  isTrial                Boolean   @default(true)
+  trialEndsAt            DateTime?
+  startDate              DateTime  @default(now())
+  nextBillingDate        DateTime
+  lastPaymentDate        DateTime?
+  paymentProvider        String?   @default("SIMULATED")
+  externalSubscriptionId String?
+  externalCustomerId     String?
+  externalPaymentId      String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  plan    Plan    @relation(fields: [planId], references: [id])
+
+  @@map("subscriptions")
+}
+
+model PaymentHistory {
+  id             String   @id @default(uuid())
+  companyId      String
+  subscriptionId String
+  amount         Float
+  status         String
+  provider       String
+  transactionId  String
+  createdAt      DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@map("payment_histories")
+}
+
+model CommercialLead {
+  id            String   @id @default(uuid())
+  name          String
+  companyName   String
+  email         String
+  phone         String
+  usersCount    Int
+  status        String   @default("Novo Lead")
+  planName      String   @default("Professional")
+  responsibleId String?
+  notes         String?
+  createdAt     DateTime @default(now())
+
+  responsible CommercialUser? @relation(fields: [responsibleId], references: [id], onDelete: SetNull)
+
+  @@map("commercial_leads")
+}
+
+model CommercialUser {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  team      String   @default("Vendas SaaS")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  leads CommercialLead[]
+
+  @@map("commercial_users")
+}
+
+model SupportTicket {
+  id          String   @id @default(uuid())
+  companyId   String
+  userId      String
+  subject     String
+  description String
+  priority    String   @default("MEDIA")
+  status      String   @default("ABERTO")
+  category    String   @default("SUPORTE")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company  Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages TicketMessage[]
+
+  @@index([companyId])
+  @@index([userId])
+  @@map("support_tickets")
+}
+
+model TicketMessage {
+  id        String   @id @default(uuid())
+  ticketId  String
+  senderId  String
+  message   String
+  createdAt DateTime @default(now())
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  sender User          @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@index([senderId])
+  @@map("ticket_messages")
+}
+
+model SubscriptionHistory {
+  id        String   @id @default(uuid())
+  companyId String
+  planId    String
+  status    String
+  action    String
+  price     Float
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  plan    Plan    @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@map("subscription_histories")
+}
+
+model SaasEvent {
+  id        String   @id @default(uuid())
+  type      String
+  companyId String?
+  amount    Float    @default(0)
+  notes     String?
+  createdAt DateTime @default(now())
+
+  @@map("saas_events")
+}
+
+model AiAgent {
+  id               String   @id @default(uuid())
+  companyId        String
+  name             String
+  avatar           String?
+  description      String?
+  category         String   @default("Personalizado")
+  responsibleId   String?
+  modelId          String?
+  modelName        String   @default("gpt-4o")
+  provider         String   @default("OpenAI")
+  status           String   @default("ACTIVE")
+  personality      String   @default("PROFESSIONAL")
+  toneOfVoice      String?
+  emoji            String   @default("🤖")
+  temperature      Float    @default(0.7)
+  maxTokens        Int      @default(2048)
+  initialMessage   String?
+  systemPrompt     String?
+  objective        String?
+  instructions     String?
+  language         String   @default("pt-BR")
+  creativity       String   @default("BALANCED")
+  memoryEnabled    Boolean  @default(true)
+  memoryConfig     String?
+  knowledgeBaseIds String?
+  isActive         Boolean  @default(true)
+  isPublished      Boolean  @default(true)
+  version          Int      @default(1)
+  toolsConfig      String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  company        Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  responsible    User?            @relation(fields: [responsibleId], references: [id], onDelete: SetNull)
+  executions     AgentExecution[]
+  logs           AgentLog[]
+  memories           AgentMemory[]
+  prompts            AiPrompt[]
+  knowledgeBases     KnowledgeBase[]
+  playgroundSessions PlaygroundSession[]
+
+  @@index([companyId])
+  @@index([responsibleId])
+  @@map("ai_agents")
+}
+
+model AiModel {
+  id                 String   @id @default(uuid())
+  name               String
+  provider           String
+  slug               String   @unique
+  description        String?
+  contextWindow      Int      @default(128000)
+  maxOutputTokens    Int      @default(4096)
+  costPerInputToken  Float    @default(0.0)
+  costPerOutputToken Float    @default(0.0)
+  isActive           Boolean  @default(true)
+  isDefault          Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@map("ai_models")
+}
+
+model AiPrompt {
+  id         String   @id @default(uuid())
+  companyId  String?
+  agentId    String?
+  title      String
+  category   String?
+  content    String
+  variables  String?
+  isTemplate Boolean  @default(false)
+  currentVer Int      @default(1)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  agent    AiAgent?          @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  versions AiPromptVersion[]
+
+  @@map("ai_prompts")
+}
+
+model AiPromptVersion {
+  id        String   @id @default(uuid())
+  promptId  String
+  version   Int
+  content   String
+  changelog String?
+  authorId  String?
+  createdAt DateTime @default(now())
+
+  prompt AiPrompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
+
+  @@index([promptId])
+  @@map("ai_prompt_versions")
+}
+
+model AiTool {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  description String?
+  category    String?
+  enabled     Boolean  @default(true)
+  schema      String?
+  config      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("ai_tools")
+}
+
+model KnowledgeBase {
+  id          String   @id @default(uuid())
+  companyId   String
+  agentId     String?
+  name        String
+  description String?
+  status      String   @default("ACTIVE")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  agent   AiAgent?        @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  files   KnowledgeFile[]
+  pages   KnowledgePage[]
+
+  @@index([companyId])
+  @@map("knowledge_base")
+}
+
+model KnowledgeFile {
+  id              String   @id @default(uuid())
+  knowledgeBaseId String
+  name            String
+  fileType        String
+  fileSize        Int      @default(0)
+  fileUrl         String?
+  status          String   @default("READY")
+  createdAt       DateTime @default(now())
+
+  knowledgeBase KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+
+  @@index([knowledgeBaseId])
+  @@map("knowledge_files")
+}
+
+model KnowledgePage {
+  id              String   @id @default(uuid())
+  knowledgeBaseId String
+  url             String
+  title           String?
+  status          String   @default("INDEXED")
+  createdAt       DateTime @default(now())
+
+  knowledgeBase KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+
+  @@index([knowledgeBaseId])
+  @@map("knowledge_pages")
+}
+
+model KnowledgeLibrary {
+  id          String   @id @default(uuid())
+  companyId   String
+  name        String
+  category    String   @default("Produtos")
+  description String?
+  icon        String   @default("📚")
+  color       String   @default("#2563EB")
+  accessLevel String   @default("EDITOR")
+  status      String   @default("ACTIVE")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company   Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  documents KnowledgeDocument[]
+  faqs      KnowledgeFaq[]
+
+  @@index([companyId])
+  @@map("knowledge_libraries")
+}
+
+model KnowledgeDocument {
+  id          String   @id @default(uuid())
+  libraryId   String
+  name        String
+  fileType    String   @default("PDF")
+  fileSize    Int      @default(0)
+  fileUrl     String?
+  status      String   @default("READY")
+  version     Int      @default(1)
+  content     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  library  KnowledgeLibrary           @relation(fields: [libraryId], references: [id], onDelete: Cascade)
+  versions KnowledgeDocumentVersion[]
+
+  @@index([libraryId])
+  @@map("knowledge_hub_documents")
+}
+
+model KnowledgeDocumentVersion {
+  id         String   @id @default(uuid())
+  documentId String
+  version    Int
+  fileUrl    String?
+  changelog  String?
+  authorId   String?
+  createdAt  DateTime @default(now())
+
+  document KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@map("knowledge_hub_document_versions")
+}
+
+model KnowledgeFaq {
+  id         String   @id @default(uuid())
+  libraryId  String
+  question   String
+  answer     String
+  category   String?
+  tags       String?
+  status     String   @default("PUBLISHED")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  library KnowledgeLibrary @relation(fields: [libraryId], references: [id], onDelete: Cascade)
+
+  @@index([libraryId])
+  @@map("knowledge_faqs")
+}
+
+model KnowledgeCategory {
+  id          String   @id @default(uuid())
+  companyId   String
+  name        String
+  slug        String
+  description String?
+  createdAt   DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@map("knowledge_hub_categories")
+}
+
+model KnowledgeTag {
+  id        String   @id @default(uuid())
+  companyId String
+  name      String
+  slug      String
+  color     String   @default("#3B82F6")
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@map("knowledge_hub_tags")
+}
+
+model MemoryProfile {
+  id               String   @id @default(uuid())
+  companyId        String
+  contactId        String?
+  customerName     String
+  companyName      String?
+  preferences      String?
+  language         String   @default("pt-BR")
+  toneOfVoice      String?  @default("Profissional")
+  interestedItems  String?
+  lastPurchase     String?
+  lastInteraction  DateTime @default(now())
+  satisfactionScore Float   @default(5.0)
+  autoSummary      String?
+  notes            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  company       Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  conversations MemoryConversation[]
+  summaries     MemorySummary[]
+
+  @@index([companyId])
+  @@map("memory_profiles")
+}
+
+model MemoryConversation {
+  id          String   @id @default(uuid())
+  companyId   String
+  profileId   String?
+  agentId     String?
+  channel     String   @default("WEB")
+  sessionKey  String?
+  messages    String
+  createdAt   DateTime @default(now())
+
+  profile MemoryProfile? @relation(fields: [profileId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([profileId])
+  @@map("memory_conversations")
+}
+
+model MemorySummary {
+  id          String   @id @default(uuid())
+  companyId   String
+  profileId   String?
+  periodType  String   @default("DAILY") // DAILY, WEEKLY, MONTHLY, CONVERSATION, CUSTOMER
+  content     String
+  createdAt   DateTime @default(now())
+
+  profile MemoryProfile? @relation(fields: [profileId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([profileId])
+  @@map("memory_summaries")
+}
+
+model MemorySession {
+  id          String   @id @default(uuid())
+  companyId   String
+  sessionKey  String   @unique
+  agentId     String?
+  active      Boolean  @default(true)
+  metadata    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([companyId])
+  @@map("memory_sessions")
+}
+
+model MemoryEvent {
+  id          String   @id @default(uuid())
+  companyId   String
+  eventType   String
+  payload     String?
+  createdAt   DateTime @default(now())
+
+  @@index([companyId])
+  @@map("memory_events")
+}
+
+model MemoryTag {
+  id        String   @id @default(uuid())
+  companyId String
+  name      String
+  color     String   @default("#8B5CF6")
+  createdAt DateTime @default(now())
+
+  @@index([companyId])
+  @@map("memory_tags")
+}
+
+model MemoryShared {
+  id           String   @id @default(uuid())
+  companyId    String
+  sourceAgent  String
+  targetAgent  String
+  scope        String   @default("ALL_CLIENTS")
+  status       String   @default("ACTIVE")
+  createdAt    DateTime @default(now())
+
+  @@index([companyId])
+  @@map("memory_shared")
+}
+
+model MemorySettings {
+  id                String   @id @default(uuid())
+  companyId         String   @unique
+  retentionDays     Int      @default(365)
+  contextWindowSize Int      @default(128000)
+  autoSummaryPeriod String   @default("DAILY")
+  sharedMemory      Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("memory_settings")
+}
+
+model AgentMemory {
+  id        String   @id @default(uuid())
+  agentId   String
+  type      String   @default("SHORT_TERM")
+  key       String?
+  content   String
+  metadata  String?
+  createdAt DateTime @default(now())
+
+  agent AiAgent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId])
+  @@map("agent_memories")
+}
+
+model AgentExecution {
+  id               String   @id @default(uuid())
+  companyId        String
+  agentId          String
+  userId           String?
+  status           String   @default("COMPLETED")
+  promptTokens     Int      @default(0)
+  completionTokens Int      @default(0)
+  totalTokens      Int      @default(0)
+  cost             Float    @default(0.0)
+  executionTimeMs  Int      @default(0)
+  provider         String?  @default("OpenAI")
+  modelName        String?  @default("gpt-4o")
+  input            String?
+  output           String?
+  createdAt        DateTime @default(now())
+
+  company Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  agent   AiAgent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  logs    AgentLog[]
+
+  @@index([companyId])
+  @@index([agentId])
+  @@map("agent_executions")
+}
+
+model AgentLog {
+  id          String   @id @default(uuid())
+  companyId   String
+  agentId     String?
+  executionId String?
+  level       String   @default("INFO")
+  message     String
+  details     String?
+  createdAt   DateTime @default(now())
+
+  company   Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  agent     AiAgent?        @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  execution AgentExecution? @relation(fields: [executionId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([agentId])
+  @@index([executionId])
+  @@map("agent_logs")
+}
+
+model PlaygroundSession {
+  id              String   @id @default(uuid())
+  companyId       String
+  agentId         String?
+  name            String   @default("Sessão de Teste")
+  provider        String   @default("OpenAI")
+  modelName       String   @default("gpt-4o")
+  temperature     Float    @default(0.7)
+  maxTokens       Int      @default(2048)
+  systemPrompt    String?
+  tools           String?
+  memoryTypes     String?
+  knowledgeLibs   String?
+  messages        String?
+  executionTimeMs Int      @default(0)
+  tokensUsed      Int      @default(0)
+  cost            Float    @default(0.0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  company Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  agent   AiAgent? @relation(fields: [agentId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@map("playground_sessions")
+}
+
+model PlaygroundPreset {
+  id           String   @id @default(uuid())
+  companyId    String
+  name         String
+  description  String?
+  systemPrompt String
+  provider     String   @default("OpenAI")
+  modelName    String   @default("gpt-4o")
+  temperature  Float    @default(0.7)
+  tools        String?
+  createdAt    DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@map("playground_presets")
+}
+
+model AiWorkflow {
+  id          String   @id @default(uuid())
+  companyId   String
+  name        String
+  description String?
+  status      String   @default("DRAFT")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  nodes   AiWorkflowNode[]
+  edges   AiWorkflowEdge[]
+
+  @@index([companyId])
+  @@map("ai_workflows")
+}
+
+model AiWorkflowNode {
+  id         String   @id @default(uuid())
+  workflowId String
+  type       String
+  name       String
+  config     String?
+  positionX  Float    @default(0)
+  positionY  Float    @default(0)
+  createdAt  DateTime @default(now())
+
+  workflow AiWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+  @@map("ai_workflow_nodes")
+}
+
+model AiWorkflowEdge {
+  id           String   @id @default(uuid())
+  workflowId   String
+  sourceNodeId String
+  targetNodeId String
+  label        String?
+  createdAt    DateTime @default(now())
+
+  workflow AiWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+  @@map("ai_workflow_edges")
+}
+
+model CompanyFeatureFlag {
+  id        String   @id @default(uuid())
+  companyId String
+  flagKey   String
+  enabled   Boolean  @default(true)
+  config    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, flagKey])
+  @@index([companyId])
+  @@map("company_feature_flags")
+}
+
+model McpServer {
+  id        String   @id @default(uuid())
+  companyId String
+  name      String
+  slug      String
+  type      String   @default("STDIO")
+  urlOrCmd  String?
+  status    String   @default("DISCONNECTED")
+  config    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company   Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  tools     McpTool[]
+  resources McpResource[]
+
+  @@index([companyId])
+  @@map("mcp_servers")
+}
+
+model McpTool {
+  id          String   @id @default(uuid())
+  serverId    String
+  name        String
+  description String?
+  inputSchema String?
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  server McpServer @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+  @@index([serverId])
+  @@map("mcp_tools")
+}
+
+model McpResource {
+  id          String   @id @default(uuid())
+  serverId    String
+  uri         String
+  name        String
+  mimeType    String?
+  description String?
+  createdAt   DateTime @default(now())
+
+  server McpServer @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+  @@index([serverId])
+  @@map("mcp_resources")
+}
+
+model CompanySecret {
+  id             String   @id @default(uuid())
+  companyId      String
+  keyName        String   // OPENAI_API_KEY, CLAUDE_API_KEY, GEMINI_API_KEY, etc.
+  encryptedValue String   // AES-256-GCM
+  maskedValue    String   // sk-proj-...8A3f
+  category       String   @default("PROVIDER") // PROVIDER, MCP, WEBHOOK, API
+  createdBy      String?
+  updatedBy      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, keyName])
+  @@index([companyId])
+  @@map("company_secrets")
+}
+
+model CompanyProvider {
+  id                String   @id @default(uuid())
+  companyId         String
+  providerName      String   // OpenAI, Anthropic, Google Gemini, DeepSeek, Grok, Ollama, OpenRouter
+  status            String   @default("ACTIVE") // ACTIVE, INACTIVE, DEGRADED
+  defaultModel      String   @default("gpt-4o")
+  timeoutMs         Int      @default(30000)
+  retryCount        Int      @default(3)
+  fallbackEnabled   Boolean  @default(true)
+  streamingEnabled  Boolean  @default(true)
+  dailyTokenLimit   Int      @default(1000000)
+  monthlyTokenLimit Int      @default(30000000)
+  requestTokenLimit Int      @default(8192)
+  monthlyCostUsd    Float    @default(0.0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, providerName])
+  @@index([companyId])
+  @@map("company_providers")
+}
+
+model CompanyProviderModel {
+  id            String   @id @default(uuid())
+  companyId     String
+  providerName  String
+  modelSlug     String
+  modelName     String
+  description   String?
+  contextWindow Int      @default(128000)
+  maxOutput     Int      @default(4096)
+  isDefault     Boolean  @default(false)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@map("company_provider_models")
+}
+
+model CompanyFallbackChain {
+  id         String   @id @default(uuid())
+  companyId  String
+  priority   Int      @default(1)
+  provider   String   // OpenAI, Claude, Gemini, DeepSeek, OpenRouter, Ollama
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@map("company_fallback_chains")
+}
+
+model SecretAuditLog {
+  id        String   @id @default(uuid())
+  companyId String
+  action    String   // CREATE, UPDATE, DELETE, ACCESS
+  keyName   String
+  actorUser String?
+  details   String?
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@map("secret_audit_logs")
+}

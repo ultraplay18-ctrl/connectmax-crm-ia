@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  # 1. Banco de Dados PostgreSQL Relacional
+  postgres:
+    image: postgres:15-alpine
+    container_name: connectmax_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-connectmax}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-connectmax_secret_2026}
+      POSTGRES_DB: ${POSTGRES_DB:-connectmax_crm_ia}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-connectmax} -d ${POSTGRES_DB:-connectmax_crm_ia}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 2. Backend NestJS REST API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: connectmax_backend
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://${POSTGRES_USER:-connectmax}:${POSTGRES_PASSWORD:-connectmax_secret_2026}@postgres:5432/${POSTGRES_DB:-connectmax_crm_ia}?schema=public
+      JWT_SECRET: ${JWT_SECRET:-connectmax_jwt_production_secret_key_2026_super_secure}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-connectmax_refresh_production_secret_key_2026}
+      JWT_EXPIRES_IN: 1d
+      JWT_REFRESH_EXPIRES_IN: 7d
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # 3. Frontend Next.js 14 Web Application
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: connectmax_frontend
+    restart: always
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001/api/v1}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

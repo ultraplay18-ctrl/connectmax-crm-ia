@@ -1,0 +1,103 @@
+import { Injectable } from '@nestjs/common';
+import { AiProviderFactory } from '../providers/ai-provider.factory';
+
+@Injectable()
+export class AiModelsService {
+  constructor(private readonly providerFactory: AiProviderFactory) {}
+
+  async findAll() {
+    return [
+      {
+        id: 'mod-1',
+        name: 'GPT-4o',
+        provider: 'OpenAI',
+        slug: 'gpt-4o',
+        description: 'Modelo de linguagem de alta velocidade e precisão para raciocínio multimodal e texto.',
+        contextWindow: 128000,
+        maxOutputTokens: 4096,
+        costPerInputToken: 0.000005,
+        costPerOutputToken: 0.000015,
+        isActive: true,
+        isDefault: true,
+      },
+      {
+        id: 'mod-2',
+        name: 'Claude 3.5 Sonnet',
+        provider: 'Anthropic',
+        slug: 'claude-3-5-sonnet',
+        description: 'Modelo de ponta para código, redação técnica e análise profunda de contextos.',
+        contextWindow: 200000,
+        maxOutputTokens: 8192,
+        costPerInputToken: 0.000003,
+        costPerOutputToken: 0.000015,
+        isActive: true,
+        isDefault: false,
+      },
+      {
+        id: 'mod-3',
+        name: 'Gemini 1.5 Pro',
+        provider: 'Google',
+        slug: 'gemini-1-5-pro',
+        description: 'Janela de contexto ultra-longa de 2 milhões de tokens com suporte a vídeos e docs extensos.',
+        contextWindow: 2000000,
+        maxOutputTokens: 8192,
+        costPerInputToken: 0.0000035,
+        costPerOutputToken: 0.0000105,
+        isActive: true,
+        isDefault: false,
+      },
+      {
+        id: 'mod-4',
+        name: 'DeepSeek V3',
+        provider: 'DeepSeek',
+        slug: 'deepseek-v3',
+        description: 'Modelo open-weights de altíssimo desempenho para lógica e programação com custo otimizado.',
+        contextWindow: 64000,
+        maxOutputTokens: 4096,
+        costPerInputToken: 0.0000005,
+        costPerOutputToken: 0.000002,
+        isActive: true,
+        isDefault: false,
+      },
+      {
+        id: 'mod-5',
+        name: 'Grok 2',
+        provider: 'xAI',
+        slug: 'grok-2',
+        description: 'Modelo avançado para inteligência em tempo real e análise crítica de dados.',
+        contextWindow: 128000,
+        maxOutputTokens: 4096,
+        costPerInputToken: 0.000004,
+        costPerOutputToken: 0.000012,
+        isActive: true,
+        isDefault: false,
+      },
+      {
+        id: 'mod-6',
+        name: 'Llama 3.3 70B (Ollama Local)',
+        provider: 'Ollama',
+        slug: 'llama3-local',
+        description: 'Execução 100% privada e local via servidor Ollama na infraestrutura da empresa.',
+        contextWindow: 32000,
+        maxOutputTokens: 4096,
+        costPerInputToken: 0.0,
+        costPerOutputToken: 0.0,
+        isActive: true,
+        isDefault: false,
+      },
+      {
+        id: 'mod-7',
+        name: 'OpenRouter Unified',
+        provider: 'OpenRouter',
+        slug: 'openrouter-auto',
+        description: 'Roteador dinâmico de modelos via gateway OpenRouter com seleção automática de custo/performance.',
+        contextWindow: 128000,
+        maxOutputTokens: 4096,
+        costPerInputToken: 0.000003,
+        costPerOutputToken: 0.000009,
+        isActive: true,
+        isDefault: false,
+      },
+    ];
+  }
+}
