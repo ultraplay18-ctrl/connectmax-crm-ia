@@ -11,7 +11,11 @@ export class SubscriptionsService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    await this.seedPlans();
+    try {
+      await this.seedPlans();
+    } catch (error: any) {
+      console.warn('[SubscriptionsService] Aviso no seedPlans durante inicialização:', error?.message || error);
+    }
   }
 
   // 1. Seed Inicial dos Planos Comercializados
