@@ -12,7 +12,7 @@ COPY . .
 
 RUN npx prisma generate
 RUN npm run build
-
+RUN echo "=== DIST ===" && ls -R dist
 # Estágio 2: Imagem final leve de produção
 FROM node:20-alpine AS runner
 
