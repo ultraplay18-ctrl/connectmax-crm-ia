@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from '../../layouts/DashboardLayout';
 import { Card } from '../../components/Card';
 import { Input } from '../../components/Input';
@@ -15,26 +15,49 @@ export default function ProfilePage() {
   const [name, setName] = useState(user?.name || '');
   const [email, setEmail] = useState(user?.email || '');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (user) {
+      setName(user.name || '');
+      setEmail(user.email || '');
+    }
+  }, [user]);
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage('');
     setError('');
+
+    // Validação de confirmação de senha
+    if (password || confirmPassword) {
+      if (password !== confirmPassword) {
+        setError('As senhas digitadas não coincidem. Por favor, verifique os campos.');
+        return;
+      }
+      if (password.length < 6) {
+        setError('A nova senha deve conter pelo menos 6 caracteres.');
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
-      await api.patch('/users/me', {
-        name,
-        email,
-        ...(password ? { password } : {}),
-      });
+      const payload: any = { name, email };
+      if (password.trim() !== '') {
+        payload.password = password.trim();
+      }
+
+      await api.patch('/users/me', payload);
 
       await refetchUser();
       setMessage('Perfil atualizado com sucesso!');
       setPassword('');
+      setConfirmPassword('');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Erro ao atualizar perfil.');
     } finally {
@@ -106,16 +129,28 @@ export default function ProfilePage() {
                 required
               />
 
-              <Input
-                label="Nova Senha (deixe em branco para manter a atual)"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                leftIcon={<Lock size={18} />}
-              />
+              <div className="pt-2 border-t border-slate-100 space-y-4">
+                <p className="text-xs font-semibold text-slate-700">Alterar Senha de Acesso</p>
+                <Input
+                  label="Nova Senha (opcional)"
+                  type="password"
+                  placeholder="Deixe em branco para manter a senha atual"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  leftIcon={<Lock size={18} />}
+                />
 
-              <div className="pt-2">
+                <Input
+                  label="Confirmar Nova Senha"
+                  type="password"
+                  placeholder="Repita a nova senha digitada"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  leftIcon={<Lock size={18} />}
+                />
+              </div>
+
+              <div className="pt-3">
                 <Button type="submit" variant="primary" isLoading={loading}>
                   Salvar Alterações
                 </Button>
