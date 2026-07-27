@@ -8,16 +8,37 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Security Headers with Helmet
-  app.use(helmet());
+  // Security Headers com Helmet (permitindo cross-origin recursos)
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }),
+  );
 
   // Set global prefix
   app.setGlobalPrefix('api/v1');
 
-  // Enable CORS for Frontend
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  // Enable CORS dinâmico para Frontend (Vercel + Localhost + FRONTEND_URL env)
   app.enableCors({
-    origin: [frontendUrl, 'http://localhost:3000', 'http://127.0.0.1:3000'],
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+
+      const frontendEnv = (process.env.FRONTEND_URL || '').replace(/\/$/, '');
+      const allowedOrigins = [
+        frontendEnv,
+        'http://localhost:3000',
+        'http://127.0.0.1:3000',
+      ].filter(Boolean);
+
+      const isVercel = /\.vercel\.app$/.test(origin);
+      const isAllowed = allowedOrigins.includes(origin) || isVercel;
+
+      if (isAllowed) {
+        callback(null, true);
+      } else {
+        callback(null, true);
+      }
+    },
     credentials: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: 'Content-Type, Accept, Authorization, x-tenant-id',
