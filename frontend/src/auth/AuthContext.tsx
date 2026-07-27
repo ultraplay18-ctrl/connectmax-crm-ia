@@ -85,10 +85,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await api.post('/auth/login', credentials);
       const { accessToken, refreshToken, user: userData } = response.data;
 
-      Cookies.set('accessToken', accessToken, { expires: 1, path: '/' });
-      Cookies.set('refreshToken', refreshToken, { expires: 7, path: '/' });
+      const isSecure = typeof window !== 'undefined' && window.location.protocol === 'https:';
+      const cookieOptions: Cookies.CookieAttributes = {
+        path: '/',
+        secure: isSecure,
+        sameSite: 'lax',
+      };
+
+      Cookies.set('accessToken', accessToken, { ...cookieOptions, expires: 1 });
+      Cookies.set('refreshToken', refreshToken, { ...cookieOptions, expires: 7 });
       if (userData.companyId) {
-        Cookies.set('tenantId', userData.companyId, { expires: 7, path: '/' });
+        Cookies.set('tenantId', userData.companyId, { ...cookieOptions, expires: 7 });
       }
 
       setUser(userData);
@@ -106,10 +113,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await api.post('/auth/register', data);
       const { accessToken, refreshToken, user: userData, company } = response.data;
 
-      Cookies.set('accessToken', accessToken, { expires: 1, path: '/' });
-      Cookies.set('refreshToken', refreshToken, { expires: 7, path: '/' });
+      const isSecure = typeof window !== 'undefined' && window.location.protocol === 'https:';
+      const cookieOptions: Cookies.CookieAttributes = {
+        path: '/',
+        secure: isSecure,
+        sameSite: 'lax',
+      };
+
+      Cookies.set('accessToken', accessToken, { ...cookieOptions, expires: 1 });
+      Cookies.set('refreshToken', refreshToken, { ...cookieOptions, expires: 7 });
       if (company?.id) {
-        Cookies.set('tenantId', company.id, { expires: 7, path: '/' });
+        Cookies.set('tenantId', company.id, { ...cookieOptions, expires: 7 });
       }
 
       setUser({
