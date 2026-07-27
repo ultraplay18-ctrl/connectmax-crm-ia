@@ -12,8 +12,9 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ onOpenSidebar }) => {
   const { user, logout } = useAuth();
 
-  const getRoleLabel = (role?: string) => {
-    switch (role) {
+  const getRoleLabel = (role?: any) => {
+    const roleStr = typeof role === 'object' ? role?.name : role;
+    switch (roleStr) {
       case 'SUPER_ADMIN':
         return 'Super Admin';
       case 'COMPANY_ADMIN':

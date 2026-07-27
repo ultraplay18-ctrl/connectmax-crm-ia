@@ -72,7 +72,7 @@ export default function DashboardPage() {
               <ShieldCheck className="text-emerald-400 shrink-0" size={20} />
               <div>
                 <p className="font-semibold text-white">Ambiente Seguro e Isolado</p>
-                <p className="text-slate-300">Nível de permissão: {user?.role}</p>
+                <p className="text-slate-300">Nível de permissão: {typeof user?.role === 'object' ? (user?.role as any)?.name : user?.role}</p>
               </div>
             </div>
           </div>

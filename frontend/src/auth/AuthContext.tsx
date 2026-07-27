@@ -55,7 +55,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('[DEBUG Auth] Buscando /users/me...');
       const response = await api.get('/users/me');
       console.log('[DEBUG Auth] Usuário obtido:', response.data);
-      setUser(response.data);
+
+      const rawRole = response.data.role;
+      const roleStr = typeof rawRole === 'object' ? rawRole?.name || 'COMPANY_ADMIN' : rawRole;
+      const companyNameStr = response.data.company?.name || response.data.companyName || 'Sua Empresa';
+
+      const userProfile: UserProfile = {
+        ...response.data,
+        role: roleStr,
+        companyName: companyNameStr,
+      };
+
+      setUser(userProfile);
       if (response.data.companyId) {
         Cookies.set('tenantId', response.data.companyId, { expires: 7, path: '/' });
       }

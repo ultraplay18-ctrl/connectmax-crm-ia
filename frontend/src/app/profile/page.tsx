@@ -63,7 +63,9 @@ export default function ProfilePage() {
               <div className="mt-4 flex flex-col gap-2 w-full pt-4 border-t border-slate-100">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-slate-500">Nível de Acesso</span>
-                  <Badge variant={user?.role === 'SUPER_ADMIN' ? 'red' : 'blue'}>{user?.role}</Badge>
+                  <Badge variant={user?.role === 'SUPER_ADMIN' ? 'red' : 'blue'}>
+                    {typeof user?.role === 'object' ? (user?.role as any)?.name : user?.role}
+                  </Badge>
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-slate-500">ID da Empresa</span>
