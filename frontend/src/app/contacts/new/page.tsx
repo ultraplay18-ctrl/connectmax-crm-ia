@@ -6,8 +6,10 @@ import { DashboardLayout } from '../../../layouts/DashboardLayout';
 import { Card } from '../../../components/Card';
 import { Input } from '../../../components/Input';
 import { Button } from '../../../components/Button';
+import { Toast, ToastProps } from '../../../components/Toast';
 import { api } from '../../../services/api';
-import { Users, User, Mail, Phone, FileText, Building, Briefcase, FileCode, ArrowLeft, CheckCircle2, AlertCircle } from 'lucide-react';
+import { maskDocumentInput, maskPhoneInput, isValidEmail, isValidCPF, isValidCNPJ } from '../../../utils/formatters';
+import { Users, User, Mail, Phone, FileText, Building, Briefcase, ArrowLeft, CheckCircle2, AlertCircle } from 'lucide-react';
 
 export default function NewContactPage() {
   const router = useRouter();
@@ -16,26 +18,66 @@ export default function NewContactPage() {
     email: '',
     phone: '',
     document: '',
-    type: 'INDIVIDUAL',
+    type: 'INDIVIDUAL' as 'INDIVIDUAL' | 'COMPANY',
     companyName: '',
     position: '',
     notes: '',
-    status: 'ACTIVE',
+    status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE' | 'LEAD',
   });
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [toast, setToast] = useState<Omit<ToastProps, 'onClose'> | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    let formattedValue = value;
+
+    if (name === 'document') {
+      formattedValue = maskDocumentInput(value);
+    } else if (name === 'phone') {
+      formattedValue = maskPhoneInput(value);
+    }
+
+    setFormData((prev) => ({ ...prev, [name]: formattedValue }));
+    setFieldErrors((prev) => ({ ...prev, [name]: '' }));
+  };
+
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    if (!formData.name.trim()) {
+      errors.name = 'O nome do cliente ou razão social é obrigatório.';
+    }
+
+    if (formData.email.trim() && !isValidEmail(formData.email)) {
+      errors.email = 'Insira um endereço de e-mail válido (ex: contato@empresa.com).';
+    }
+
+    if (formData.document.trim()) {
+      const cleanDoc = formData.document.replace(/\D/g, '');
+      if (formData.type === 'INDIVIDUAL') {
+        if (cleanDoc.length !== 11 || !isValidCPF(formData.document)) {
+          errors.document = 'CPF inválido. Verifique os números digitados.';
+        }
+      } else {
+        if (cleanDoc.length !== 14 || !isValidCNPJ(formData.document)) {
+          errors.document = 'CNPJ inválido. Verifique os números digitados.';
+        }
+      }
+    }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (!formData.name) {
-      setError('O nome do contato é obrigatório.');
+    if (!validateForm()) {
+      setError('Por favor, corrija os erros nos campos destacados antes de salvar.');
       return;
     }
 
@@ -44,7 +86,13 @@ export default function NewContactPage() {
       await api.post('/contacts', formData);
       router.push('/contacts');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Erro ao cadastrar contato. Verifique os dados.');
+      console.error('Erro ao cadastrar contato:', err);
+      const backendMessage = err.response?.data?.message;
+      if (Array.isArray(backendMessage)) {
+        setError(backendMessage.join(' | '));
+      } else {
+        setError(backendMessage || 'Erro ao cadastrar cliente. Verifique se o servidor está online.');
+      }
     } finally {
       setLoading(false);
     }
@@ -53,6 +101,12 @@ export default function NewContactPage() {
   return (
     <DashboardLayout>
       <div className="max-w-4xl mx-auto space-y-6">
+        {toast && (
+          <div className="fixed top-5 right-5 z-50 max-w-md w-full animate-in fade-in slide-in-from-top-3 duration-300">
+            <Toast type={toast.type} message={toast.message} onClose={() => setToast(null)} />
+          </div>
+        )}
+
         {/* Topbar */}
         <div className="flex items-center gap-4">
           <a href="/contacts">
@@ -64,13 +118,15 @@ export default function NewContactPage() {
             <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
               Cadastrar Novo Cliente / Contato
             </h1>
-            <p className="text-xs text-slate-500 mt-0.5">Preencha as informações para adicionar um novo cliente à sua empresa.</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Preencha as informações abaixo com validação automática de dados.
+            </p>
           </div>
         </div>
 
         <Card title="Dados do Cliente">
           {error && (
-            <div className="mb-6 p-4 rounded-xl bg-red-50 text-red-700 text-xs flex items-center gap-3">
+            <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-3">
               <AlertCircle size={18} className="shrink-0 text-red-600" />
               <span>{error}</span>
             </div>
@@ -85,7 +141,7 @@ export default function NewContactPage() {
               <div className="grid grid-cols-2 gap-4">
                 <button
                   type="button"
-                  onClick={() => setFormData({ ...formData, type: 'INDIVIDUAL' })}
+                  onClick={() => setFormData({ ...formData, type: 'INDIVIDUAL', document: '' })}
                   className={`p-4 rounded-xl border text-left flex items-center gap-3 transition-all ${
                     formData.type === 'INDIVIDUAL'
                       ? 'border-brand-500 bg-brand-500/10 text-brand-600 font-semibold ring-2 ring-brand-500/20'
@@ -101,7 +157,7 @@ export default function NewContactPage() {
 
                 <button
                   type="button"
-                  onClick={() => setFormData({ ...formData, type: 'COMPANY' })}
+                  onClick={() => setFormData({ ...formData, type: 'COMPANY', document: '' })}
                   className={`p-4 rounded-xl border text-left flex items-center gap-3 transition-all ${
                     formData.type === 'COMPANY'
                       ? 'border-brand-500 bg-brand-500/10 text-brand-600 font-semibold ring-2 ring-brand-500/20'
@@ -119,43 +175,66 @@ export default function NewContactPage() {
 
             {/* Informações Básicas */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input
-                label="Nome Completo ou Razão Social *"
-                name="name"
-                placeholder="Ex: Carlos Silva ou Tech Solution Ltda"
-                value={formData.name}
-                onChange={handleChange}
-                leftIcon={<User size={18} />}
-                required
-              />
+              <div>
+                <Input
+                  label="Nome Completo ou Razão Social *"
+                  name="name"
+                  placeholder="Ex: Carlos Silva ou Tech Solution Ltda"
+                  value={formData.name}
+                  onChange={handleChange}
+                  leftIcon={<User size={18} />}
+                  required
+                />
+                {fieldErrors.name && (
+                  <p className="text-[11px] text-red-600 mt-1 flex items-center gap-1">
+                    <AlertCircle size={12} /> {fieldErrors.name}
+                  </p>
+                )}
+              </div>
 
-              <Input
-                label={formData.type === 'COMPANY' ? 'CNPJ' : 'CPF'}
-                name="document"
-                placeholder={formData.type === 'COMPANY' ? '00.000.000/0001-00' : '000.000.000-00'}
-                value={formData.document}
-                onChange={handleChange}
-                leftIcon={<FileText size={18} />}
-              />
+              <div>
+                <Input
+                  label={formData.type === 'COMPANY' ? 'CNPJ' : 'CPF'}
+                  name="document"
+                  placeholder={formData.type === 'COMPANY' ? '00.000.000/0001-00' : '000.000.000-00'}
+                  value={formData.document}
+                  onChange={handleChange}
+                  leftIcon={<FileText size={18} />}
+                />
+                {fieldErrors.document && (
+                  <p className="text-[11px] text-red-600 mt-1 flex items-center gap-1">
+                    <AlertCircle size={12} /> {fieldErrors.document}
+                  </p>
+                )}
+              </div>
 
-              <Input
-                label="E-mail de Contato"
-                name="email"
-                type="email"
-                placeholder="cliente@empresa.com"
-                value={formData.email}
-                onChange={handleChange}
-                leftIcon={<Mail size={18} />}
-              />
+              <div>
+                <Input
+                  label="E-mail de Contato"
+                  name="email"
+                  type="email"
+                  placeholder="cliente@empresa.com"
+                  value={formData.email}
+                  onChange={handleChange}
+                  leftIcon={<Mail size={18} />}
+                />
+                {fieldErrors.email && (
+                  <p className="text-[11px] text-red-600 mt-1 flex items-center gap-1">
+                    <AlertCircle size={12} /> {fieldErrors.email}
+                  </p>
+                )}
+              </div>
 
-              <Input
-                label="Telefone / WhatsApp"
-                name="phone"
-                placeholder="(11) 98888-7777"
-                value={formData.phone}
-                onChange={handleChange}
-                leftIcon={<Phone size={18} />}
-              />
+              <div>
+                <Input
+                  label="Telefone / WhatsApp"
+                  name="phone"
+                  placeholder="(11) 98888-7777"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  leftIcon={<Phone size={18} />}
+                />
+              </div>
             </div>
 
             {/* Empresa e Cargo */}

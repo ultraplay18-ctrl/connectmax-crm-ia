@@ -5,6 +5,16 @@ import { UpdateContactDto } from './dto/update-contact.dto';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 
+export interface ContactsQueryDto {
+  search?: string;
+  status?: string;
+  type?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}
+
 @Injectable()
 export class ContactsService {
   constructor(
@@ -19,14 +29,14 @@ export class ContactsService {
     const contact = await this.prisma.contact.create({
       data: {
         companyId,
-        name: dto.name,
-        email: dto.email || null,
-        phone: dto.phone || null,
-        document: dto.document || null,
+        name: dto.name.trim(),
+        email: dto.email?.trim() || null,
+        phone: dto.phone?.trim() || null,
+        document: dto.document?.trim() || null,
         type: dto.type || 'INDIVIDUAL',
-        companyName: dto.companyName || null,
-        position: dto.position || null,
-        notes: dto.notes || null,
+        companyName: dto.companyName?.trim() || null,
+        position: dto.position?.trim() || null,
+        notes: dto.notes?.trim() || null,
         status: dto.status || 'ACTIVE',
       },
     });
@@ -43,27 +53,61 @@ export class ContactsService {
     return contact;
   }
 
-  async findAll(companyId: string, search?: string, status?: string) {
+  async findAll(companyId: string, query?: ContactsQueryDto) {
+    const search = query?.search?.trim();
+    const status = query?.status?.trim();
+    const type = query?.type?.trim();
+    const page = Math.max(1, Number(query?.page) || 1);
+    const limit = Math.max(1, Math.min(100, Number(query?.limit) || 10));
+    const skip = (page - 1) * limit;
+
+    const allowedSortFields = ['name', 'companyName', 'email', 'createdAt', 'status', 'type'];
+    const sortBy = allowedSortFields.includes(query?.sortBy || '') ? (query?.sortBy as string) : 'createdAt';
+    const sortOrder = query?.sortOrder === 'asc' ? 'asc' : 'desc';
+
     const whereCondition: any = { companyId };
 
     if (status) {
       whereCondition.status = status;
     }
 
+    if (type) {
+      whereCondition.type = type;
+    }
+
     if (search) {
       whereCondition.OR = [
-        { name: { contains: search } },
-        { email: { contains: search } },
-        { phone: { contains: search } },
-        { document: { contains: search } },
-        { companyName: { contains: search } },
+        { name: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+        { phone: { contains: search, mode: 'insensitive' } },
+        { document: { contains: search, mode: 'insensitive' } },
+        { companyName: { contains: search, mode: 'insensitive' } },
       ];
     }
 
-    return this.prisma.contact.findMany({
-      where: whereCondition,
-      orderBy: { createdAt: 'desc' },
-    });
+    const [total, data] = await Promise.all([
+      this.prisma.contact.count({ where: whereCondition }),
+      this.prisma.contact.findMany({
+        where: whereCondition,
+        orderBy: { [sortBy]: sortOrder },
+        skip,
+        take: limit,
+      }),
+    ]);
+
+    const totalPages = Math.ceil(total / limit) || 1;
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+      },
+    };
   }
 
   async findOne(id: string, companyId: string, isSuperAdmin = false) {
@@ -72,7 +116,7 @@ export class ContactsService {
     });
 
     if (!contact) {
-      throw new NotFoundException('Contato não encontrado.');
+      throw new NotFoundException('Cliente/Contato não encontrado.');
     }
 
     if (!isSuperAdmin && contact.companyId !== companyId) {
@@ -85,9 +129,20 @@ export class ContactsService {
   async update(id: string, companyId: string, dto: UpdateContactDto, actorUserId?: string, isSuperAdmin = false) {
     await this.findOne(id, companyId, isSuperAdmin);
 
+    const updateData: any = {};
+    if (dto.name !== undefined) updateData.name = dto.name.trim();
+    if (dto.email !== undefined) updateData.email = dto.email ? dto.email.trim() : null;
+    if (dto.phone !== undefined) updateData.phone = dto.phone ? dto.phone.trim() : null;
+    if (dto.document !== undefined) updateData.document = dto.document ? dto.document.trim() : null;
+    if (dto.type !== undefined) updateData.type = dto.type;
+    if (dto.companyName !== undefined) updateData.companyName = dto.companyName ? dto.companyName.trim() : null;
+    if (dto.position !== undefined) updateData.position = dto.position ? dto.position.trim() : null;
+    if (dto.notes !== undefined) updateData.notes = dto.notes ? dto.notes.trim() : null;
+    if (dto.status !== undefined) updateData.status = dto.status;
+
     const updated = await this.prisma.contact.update({
       where: { id },
-      data: dto,
+      data: updateData,
     });
 
     await this.auditLogsService.log({
@@ -96,7 +151,7 @@ export class ContactsService {
       action: 'CONTACT_UPDATE',
       entity: 'Contact',
       entityId: id,
-      payload: dto,
+      payload: updateData,
     });
 
     return updated;
@@ -118,6 +173,6 @@ export class ContactsService {
       payload: { name: contact.name },
     });
 
-    return { message: 'Contato removido com sucesso.' };
+    return { message: 'Cliente/Contato removido com sucesso.' };
   }
 }

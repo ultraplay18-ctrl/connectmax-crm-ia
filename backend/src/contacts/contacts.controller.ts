@@ -24,8 +24,21 @@ export class ContactsController {
     @CurrentUser('companyId') companyId: string,
     @Query('search') search?: string,
     @Query('status') status?: string,
+    @Query('type') type?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'asc' | 'desc',
   ) {
-    return this.contactsService.findAll(companyId, search, status);
+    return this.contactsService.findAll(companyId, {
+      search,
+      status,
+      type,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      sortBy,
+      sortOrder,
+    });
   }
 
   @Get(':id')
