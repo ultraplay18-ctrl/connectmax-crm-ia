@@ -1,9 +1,24 @@
 import axios from 'axios';
 import Cookies from 'js-cookie';
 
-const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
-const cleanedUrl = rawApiUrl.replace(/\/+$/, '');
-const API_URL = cleanedUrl.endsWith('/api/v1') ? cleanedUrl : `${cleanedUrl}/api/v1`;
+function getApiBaseUrl(): string {
+  // 1. Variável de Ambiente NEXT_PUBLIC_API_URL
+  const envUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (envUrl && envUrl.trim() !== '' && envUrl !== 'undefined') {
+    const cleaned = envUrl.trim().replace(/\/+$/, '');
+    return cleaned.endsWith('/api/v1') ? cleaned : `${cleaned}/api/v1`;
+  }
+
+  // 2. Se estiver rodando no navegador em produção (Vercel ou outro domínio remoto)
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    return 'https://connectmax-crm-ia.onrender.com/api/v1';
+  }
+
+  // 3. Fallback apenas para desenvolvimento local
+  return 'http://localhost:3001/api/v1';
+}
+
+const API_URL = getApiBaseUrl();
 
 export const api = axios.create({
   baseURL: API_URL,
@@ -16,6 +31,9 @@ export const api = axios.create({
 // Interceptor para injetar Access Token e x-tenant-id nas requisições
 api.interceptors.request.use(
   (config) => {
+    // Garante que o baseURL da requisição utilize o URL correto em tempo de execução
+    config.baseURL = getApiBaseUrl();
+
     const token = Cookies.get('accessToken');
     const tenantId = Cookies.get('tenantId');
 
@@ -47,18 +65,29 @@ api.interceptors.response.use(
           throw new Error('Sem refresh token');
         }
 
-        const res = await axios.post(`${API_URL}/auth/refresh`, { refreshToken }, { withCredentials: true });
+        const currentBaseUrl = getApiBaseUrl();
+        const res = await axios.post(`${currentBaseUrl}/auth/refresh`, { refreshToken }, { withCredentials: true });
 
         if (res.data.accessToken) {
-          Cookies.set('accessToken', res.data.accessToken, { expires: 1 });
+          const isSecure = typeof window !== 'undefined' && window.location.protocol === 'https:';
+          const cookieOptions: Cookies.CookieAttributes = {
+            path: '/',
+            secure: isSecure,
+            sameSite: 'lax',
+          };
+
+          Cookies.set('accessToken', res.data.accessToken, { ...cookieOptions, expires: 1 });
           if (res.data.refreshToken) {
-            Cookies.set('refreshToken', res.data.refreshToken, { expires: 7 });
+            Cookies.set('refreshToken', res.data.refreshToken, { ...cookieOptions, expires: 7 });
           }
 
           originalRequest.headers.Authorization = `Bearer ${res.data.accessToken}`;
           return api(originalRequest);
         }
       } catch (refreshError) {
+        Cookies.remove('accessToken', { path: '/' });
+        Cookies.remove('refreshToken', { path: '/' });
+        Cookies.remove('tenantId', { path: '/' });
         Cookies.remove('accessToken');
         Cookies.remove('refreshToken');
         Cookies.remove('tenantId');
