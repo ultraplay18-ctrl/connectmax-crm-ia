@@ -1,0 +1,20 @@
+{
+  "name": "connectmax-crm-ia",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ConnectMax CRM IA - Plataforma SaaS Multi-Tenant Monorepo",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "build": "npm run build --prefix backend",
+    "build:frontend": "npm run build --prefix frontend",
+    "start": "npm run start:prod --prefix backend",
+    "prisma:generate": "npm run prisma:generate --prefix backend",
+    "test": "npm run test --prefix backend && npm run test --prefix frontend"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}
