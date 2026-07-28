@@ -19,6 +19,11 @@ export class ContactsController {
     return this.contactsService.create(user.companyId, dto, user.userId);
   }
 
+  @Get('stats')
+  async getStats(@CurrentUser('companyId') companyId: string) {
+    return this.contactsService.getStats(companyId);
+  }
+
   @Get()
   async findAll(
     @CurrentUser('companyId') companyId: string,

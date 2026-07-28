@@ -7,7 +7,7 @@ import { Card } from '../../components/Card';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { Badge } from '../../components/Badge';
-import { TableRowSkeleton } from '../../components/Skeleton';
+import { TableRowSkeleton, Skeleton } from '../../components/Skeleton';
 import { Toast, ToastProps } from '../../components/Toast';
 import { api } from '../../services/api';
 import { formatDocument, formatPhone } from '../../utils/formatters';
@@ -30,6 +30,10 @@ import {
   ArrowUp,
   ArrowDown,
   RefreshCw,
+  Download,
+  CheckCircle2,
+  TrendingUp,
+  UserCheck,
 } from 'lucide-react';
 
 export interface Contact {
@@ -57,12 +61,22 @@ export interface PaginationMeta {
   hasPreviousPage: boolean;
 }
 
+export interface ContactStats {
+  total: number;
+  active: number;
+  leads: number;
+  inactive: number;
+  companies: number;
+  individuals: number;
+}
+
 function ContactsListContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Estados de Filtro e Paginação inicializados pela URL
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [stats, setStats] = useState<ContactStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
   const [meta, setMeta] = useState<PaginationMeta>({
     total: 0,
     page: 1,
@@ -85,7 +99,6 @@ function ContactsListContent() {
   const [deleting, setDeleting] = useState(false);
   const [toast, setToast] = useState<Omit<ToastProps, 'onClose'> | null>(null);
 
-  // Sincronizar estado na URL
   const updateUrlParams = useCallback(
     (newParams: Record<string, string | number>) => {
       const params = new URLSearchParams(searchParams.toString());
@@ -100,6 +113,18 @@ function ContactsListContent() {
     },
     [searchParams, router],
   );
+
+  const fetchStats = useCallback(async () => {
+    setStatsLoading(true);
+    try {
+      const response = await api.get('/contacts/stats');
+      setStats(response.data);
+    } catch (err) {
+      console.error('Erro ao carregar estatísticas:', err);
+    } finally {
+      setStatsLoading(false);
+    }
+  }, []);
 
   const fetchContacts = useCallback(async () => {
     setLoading(true);
@@ -137,7 +162,10 @@ function ContactsListContent() {
     }
   }, [search, statusFilter, typeFilter, page, limit, sortBy, sortOrder]);
 
-  // Debounce para busca
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
+
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
       fetchContacts();
@@ -163,11 +191,57 @@ function ContactsListContent() {
       setToast({ type: 'success', message: `Cliente "${deleteContact.name}" excluído com sucesso!` });
       setDeleteContact(null);
       fetchContacts();
+      fetchStats();
     } catch (err: any) {
       const msg = err.response?.data?.message || 'Erro ao excluir contato.';
       setToast({ type: 'error', message: msg });
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleExportCsv = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (search) params.append('search', search);
+      if (statusFilter) params.append('status', statusFilter);
+      if (typeFilter) params.append('type', typeFilter);
+      params.append('limit', '1000'); // Exportar registros filtrados
+
+      const response = await api.get(`/contacts?${params.toString()}`);
+      const list: Contact[] = response.data.data || response.data || [];
+
+      if (list.length === 0) {
+        setToast({ type: 'info', message: 'Nenhum cliente disponível para exportação.' });
+        return;
+      }
+
+      const headers = ['Nome', 'Tipo', 'Documento', 'E-mail', 'Telefone', 'Empresa', 'Cargo', 'Status', 'Data Cadastro'];
+      const rows = list.map((c) => [
+        `"${c.name.replace(/"/g, '""')}"`,
+        `"${c.type === 'COMPANY' ? 'Pessoa Jurídica' : 'Pessoa Física'}"`,
+        `"${c.document || ''}"`,
+        `"${c.email || ''}"`,
+        `"${c.phone || ''}"`,
+        `"${(c.companyName || '').replace(/"/g, '""')}"`,
+        `"${(c.position || '').replace(/"/g, '""')}"`,
+        `"${c.status}"`,
+        `"${new Date(c.createdAt).toLocaleDateString('pt-BR')}"`,
+      ]);
+
+      const csvContent = '\uFEFF' + [headers.join(';'), ...rows.map((r) => r.join(';'))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `clientes_connectmax_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setToast({ type: 'success', message: `${list.length} clientes exportados para CSV com sucesso!` });
+    } catch (err) {
+      console.error('Erro ao exportar CSV:', err);
+      setToast({ type: 'error', message: 'Erro ao gerar arquivo de exportação CSV.' });
     }
   };
 
@@ -222,11 +296,59 @@ function ContactsListContent() {
             Gerencie a base de clientes da sua empresa com isolamento multi-tenant seguro e buscas otimizadas.
           </p>
         </div>
-        <a href="/contacts/new">
-          <Button variant="primary" leftIcon={<Plus size={18} />}>
-            Novo Cliente
+        <div className="flex items-center gap-2.5">
+          <Button variant="outline" size="sm" onClick={handleExportCsv} leftIcon={<Download size={16} />}>
+            Exportar CSV
           </Button>
-        </a>
+          <a href="/contacts/new">
+            <Button variant="primary" size="sm" leftIcon={<Plus size={18} />}>
+              Novo Cliente
+            </Button>
+          </a>
+        </div>
+      </div>
+
+      {/* KPI Cards Executivos de Resumo */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm flex items-center gap-3">
+          <div className="p-3 rounded-xl bg-brand-500/10 text-brand-600">
+            <Users size={20} />
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total de Clientes</p>
+            <p className="text-lg font-bold text-slate-900">{statsLoading ? <Skeleton className="h-6 w-12" /> : stats?.total || 0}</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm flex items-center gap-3">
+          <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-600">
+            <UserCheck size={20} />
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Clientes Ativos</p>
+            <p className="text-lg font-bold text-slate-900">{statsLoading ? <Skeleton className="h-6 w-12" /> : stats?.active || 0}</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm flex items-center gap-3">
+          <div className="p-3 rounded-xl bg-amber-500/10 text-amber-600">
+            <TrendingUp size={20} />
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Leads no Funil</p>
+            <p className="text-lg font-bold text-slate-900">{statsLoading ? <Skeleton className="h-6 w-12" /> : stats?.leads || 0}</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm flex items-center gap-3">
+          <div className="p-3 rounded-xl bg-indigo-500/10 text-indigo-600">
+            <Building size={20} />
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Pessoa Jurídica (PJ)</p>
+            <p className="text-lg font-bold text-slate-900">{statsLoading ? <Skeleton className="h-6 w-12" /> : stats?.companies || 0}</p>
+          </div>
+        </div>
       </div>
 
       {/* Barra de Filtros e Busca Otimizada */}
@@ -249,6 +371,7 @@ function ContactsListContent() {
             <Filter size={14} className="text-slate-400 shrink-0" />
             <span className="font-semibold">Status:</span>
             <select
+              aria-label="Filtrar por Status"
               value={statusFilter}
               onChange={(e) => {
                 setStatusFilter(e.target.value);
@@ -267,6 +390,7 @@ function ContactsListContent() {
           <div className="flex items-center gap-1.5 text-xs text-slate-600">
             <span className="font-semibold">Tipo:</span>
             <select
+              aria-label="Filtrar por Tipo de Pessoa"
               value={typeFilter}
               onChange={(e) => {
                 setTypeFilter(e.target.value);
@@ -283,9 +407,13 @@ function ContactsListContent() {
           <Button
             variant="outline"
             size="sm"
-            onClick={fetchContacts}
+            onClick={() => {
+              fetchContacts();
+              fetchStats();
+            }}
             className="text-slate-600 hover:text-brand-600"
-            title="Atualizar lista"
+            title="Atualizar dados"
+            aria-label="Atualizar lista"
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           </Button>
@@ -436,6 +564,7 @@ function ContactsListContent() {
                         <a
                           href={`/contacts/${contact.id}`}
                           title="Ver Detalhes"
+                          aria-label={`Ver detalhes de ${contact.name}`}
                           className="p-2 text-slate-500 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
                         >
                           <Eye size={16} />
@@ -443,6 +572,7 @@ function ContactsListContent() {
                         <a
                           href={`/contacts/${contact.id}/edit`}
                           title="Editar"
+                          aria-label={`Editar ${contact.name}`}
                           className="p-2 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
                         >
                           <Edit size={16} />
@@ -450,6 +580,7 @@ function ContactsListContent() {
                         <button
                           onClick={() => setDeleteContact(contact)}
                           title="Excluir"
+                          aria-label={`Excluir ${contact.name}`}
                           className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                         >
                           <Trash2 size={16} />
@@ -463,12 +594,13 @@ function ContactsListContent() {
           </table>
         </div>
 
-        {/* Rodapé da Tabela com Paginação */}
+        {/* Rodapé com Paginação */}
         {!loading && contacts.length > 0 && (
           <div className="bg-slate-50/80 border-t border-slate-200 px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
             <div className="flex items-center gap-2">
               <span>Mostrar</span>
               <select
+                aria-label="Registros por página"
                 value={limit}
                 onChange={(e) => {
                   setLimit(Number(e.target.value));
@@ -497,6 +629,7 @@ function ContactsListContent() {
                   disabled={!meta.hasPreviousPage}
                   onClick={() => setPage((prev) => Math.max(1, prev - 1))}
                   className="px-2 py-1"
+                  aria-label="Página anterior"
                 >
                   <ChevronLeft size={16} />
                 </Button>
@@ -506,6 +639,7 @@ function ContactsListContent() {
                   disabled={!meta.hasNextPage}
                   onClick={() => setPage((prev) => prev + 1)}
                   className="px-2 py-1"
+                  aria-label="Próxima página"
                 >
                   <ChevronRight size={16} />
                 </Button>
@@ -517,14 +651,21 @@ function ContactsListContent() {
 
       {/* Modal de Confirmação de Exclusão */}
       {deleteContact && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-delete-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+        >
           <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 border border-slate-100">
             <div className="flex items-center gap-3 text-red-600">
               <div className="p-3 bg-red-50 rounded-xl">
                 <AlertTriangle size={24} />
               </div>
               <div>
-                <h3 className="text-base font-bold text-slate-900">Excluir Cliente</h3>
+                <h3 id="modal-delete-title" className="text-base font-bold text-slate-900">
+                  Excluir Cliente
+                </h3>
                 <p className="text-xs text-slate-500 mt-0.5">Esta ação é irreversível.</p>
               </div>
             </div>

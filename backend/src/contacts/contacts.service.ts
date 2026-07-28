@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { CreateContactDto } from './dto/create-contact.dto';
 import { UpdateContactDto } from './dto/update-contact.dto';
@@ -26,13 +26,35 @@ export class ContactsService {
   async create(companyId: string, dto: CreateContactDto, actorUserId?: string) {
     await this.subscriptionsService.checkContactLimit(companyId);
 
+    const email = dto.email?.trim() || null;
+    const document = dto.document?.trim() || null;
+
+    // Duplicidade dentro do mesmo tenant
+    if (document) {
+      const existingDoc = await this.prisma.contact.findFirst({
+        where: { companyId, document },
+      });
+      if (existingDoc) {
+        throw new BadRequestException(`Já existe um cliente cadastrado com o documento (${document}) nesta empresa.`);
+      }
+    }
+
+    if (email) {
+      const existingEmail = await this.prisma.contact.findFirst({
+        where: { companyId, email },
+      });
+      if (existingEmail) {
+        throw new BadRequestException(`Já existe um cliente cadastrado com o e-mail (${email}) nesta empresa.`);
+      }
+    }
+
     const contact = await this.prisma.contact.create({
       data: {
         companyId,
         name: dto.name.trim(),
-        email: dto.email?.trim() || null,
+        email,
         phone: dto.phone?.trim() || null,
-        document: dto.document?.trim() || null,
+        document,
         type: dto.type || 'INDIVIDUAL',
         companyName: dto.companyName?.trim() || null,
         position: dto.position?.trim() || null,
@@ -110,6 +132,26 @@ export class ContactsService {
     };
   }
 
+  async getStats(companyId: string) {
+    const [total, active, leads, inactive, companies, individuals] = await Promise.all([
+      this.prisma.contact.count({ where: { companyId } }),
+      this.prisma.contact.count({ where: { companyId, status: 'ACTIVE' } }),
+      this.prisma.contact.count({ where: { companyId, status: 'LEAD' } }),
+      this.prisma.contact.count({ where: { companyId, status: 'INACTIVE' } }),
+      this.prisma.contact.count({ where: { companyId, type: 'COMPANY' } }),
+      this.prisma.contact.count({ where: { companyId, type: 'INDIVIDUAL' } }),
+    ]);
+
+    return {
+      total,
+      active,
+      leads,
+      inactive,
+      companies,
+      individuals,
+    };
+  }
+
   async findOne(id: string, companyId: string, isSuperAdmin = false) {
     const contact = await this.prisma.contact.findUnique({
       where: { id },
@@ -127,13 +169,38 @@ export class ContactsService {
   }
 
   async update(id: string, companyId: string, dto: UpdateContactDto, actorUserId?: string, isSuperAdmin = false) {
-    await this.findOne(id, companyId, isSuperAdmin);
+    const current = await this.findOne(id, companyId, isSuperAdmin);
 
     const updateData: any = {};
     if (dto.name !== undefined) updateData.name = dto.name.trim();
-    if (dto.email !== undefined) updateData.email = dto.email ? dto.email.trim() : null;
+
+    if (dto.email !== undefined) {
+      const email = dto.email ? dto.email.trim() : null;
+      if (email && email !== current.email) {
+        const existingEmail = await this.prisma.contact.findFirst({
+          where: { companyId, email, id: { not: id } },
+        });
+        if (existingEmail) {
+          throw new BadRequestException(`Já existe outro cliente cadastrado com o e-mail (${email}) nesta empresa.`);
+        }
+      }
+      updateData.email = email;
+    }
+
+    if (dto.document !== undefined) {
+      const document = dto.document ? dto.document.trim() : null;
+      if (document && document !== current.document) {
+        const existingDoc = await this.prisma.contact.findFirst({
+          where: { companyId, document, id: { not: id } },
+        });
+        if (existingDoc) {
+          throw new BadRequestException(`Já existe outro cliente cadastrado com o documento (${document}) nesta empresa.`);
+        }
+      }
+      updateData.document = document;
+    }
+
     if (dto.phone !== undefined) updateData.phone = dto.phone ? dto.phone.trim() : null;
-    if (dto.document !== undefined) updateData.document = dto.document ? dto.document.trim() : null;
     if (dto.type !== undefined) updateData.type = dto.type;
     if (dto.companyName !== undefined) updateData.companyName = dto.companyName ? dto.companyName.trim() : null;
     if (dto.position !== undefined) updateData.position = dto.position ? dto.position.trim() : null;
