@@ -173,6 +173,9 @@ model Contact {
   receivables   FinancialReceivable[]
 
   @@index([companyId])
+  @@index([companyId, status])
+  @@index([companyId, type])
+  @@index([companyId, createdAt])
   @@index([email])
   @@map("contacts")
 }
@@ -202,6 +205,8 @@ model Lead {
   receivables  FinancialReceivable[]
 
   @@index([companyId])
+  @@index([companyId, status])
+  @@index([companyId, createdAt])
   @@index([contactId])
   @@index([assignedUserId])
   @@map("leads")
@@ -227,6 +232,8 @@ model Task {
   assignedUser User?    @relation(fields: [assignedUserId], references: [id], onDelete: SetNull)
 
   @@index([companyId])
+  @@index([companyId, status])
+  @@index([companyId, dueDate])
   @@index([assignedUserId])
   @@map("tasks")
 }
