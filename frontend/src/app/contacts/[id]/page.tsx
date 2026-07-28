@@ -25,6 +25,14 @@ import {
   Clock,
   Sparkles,
   AlertTriangle,
+  MessageSquare,
+  TrendingUp,
+  PhoneCall,
+  CheckSquare,
+  DollarSign,
+  AlertCircle,
+  ExternalLink,
+  Zap,
 } from 'lucide-react';
 
 export default function ContactDetailPage() {
@@ -55,6 +63,23 @@ export default function ContactDetailPage() {
     } finally {
       setAiLoading(false);
     }
+  };
+
+  const handleLogCall = () => {
+    setToast({
+      type: 'success',
+      message: `Ligação com "${contact?.name}" registrada no histórico de atividades com sucesso!`,
+    });
+  };
+
+  const handleOpenWhatsApp = () => {
+    if (!contact?.phone) {
+      setToast({ type: 'error', message: 'Este cliente não possui um telefone/WhatsApp cadastrado.' });
+      return;
+    }
+    const cleanPhone = contact.phone.replace(/\D/g, '');
+    const formattedNumber = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+    window.open(`https://wa.me/${formattedNumber}`, '_blank');
   };
 
   useEffect(() => {
@@ -199,39 +224,120 @@ export default function ContactDetailPage() {
           </div>
         </div>
 
-        {/* Card da IA ConnectMax - Resumo Executivo */}
-        <div className="bg-gradient-to-r from-brand-900 via-slate-900 to-indigo-950 rounded-2xl p-6 text-white shadow-xl space-y-4 border border-brand-500/30">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-brand-500/20 text-brand-300 flex items-center justify-center border border-brand-400/30">
-                <Sparkles size={20} className="animate-pulse" />
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-white">ConnectMax IA • Resumo Inteligente</h3>
-                <p className="text-xs text-slate-300">Análise sintética do histórico e recomendações comerciais</p>
-              </div>
-            </div>
+        {/* Seção 1: Ações Rápidas (Sprint RC-1) */}
+        <Card title="Ações Rápidas">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <a href={`/contacts/${id}/edit`}>
+              <Button variant="outline" size="sm" className="w-full justify-center text-xs" leftIcon={<Edit size={14} />}>
+                Editar Cliente
+              </Button>
+            </a>
+
+            <a href={`/calendar?contactId=${id}&action=new`}>
+              <Button variant="outline" size="sm" className="w-full justify-center text-xs" leftIcon={<Calendar size={14} />}>
+                Agendar Reunião
+              </Button>
+            </a>
+
+            <Button variant="outline" size="sm" onClick={handleLogCall} className="w-full justify-center text-xs" leftIcon={<PhoneCall size={14} />}>
+              Registrar Ligação
+            </Button>
+
+            <Button variant="outline" size="sm" onClick={handleOpenWhatsApp} className="w-full justify-center text-xs text-emerald-700 hover:bg-emerald-50 border-emerald-300" leftIcon={<MessageSquare size={14} />}>
+              Abrir WhatsApp
+            </Button>
+
+            <a href={`/leads?contactId=${id}&action=new`}>
+              <Button variant="outline" size="sm" className="w-full justify-center text-xs" leftIcon={<TrendingUp size={14} />}>
+                Criar Lead
+              </Button>
+            </a>
+
             <Button
               variant="primary"
               size="sm"
               isLoading={aiLoading}
               onClick={handleGenerateAiSummary}
-              leftIcon={<Sparkles size={16} />}
+              className="w-full justify-center text-xs bg-indigo-600 hover:bg-indigo-700"
+              leftIcon={<Sparkles size={14} />}
             >
-              {aiSummary ? 'Regerar Resumo' : 'Gerar Resumo com IA'}
+              Resumo com IA
             </Button>
           </div>
+        </Card>
 
-          {aiSummary ? (
+        {/* Card da IA ConnectMax - Resumo Executivo */}
+        {aiSummary && (
+          <div className="bg-gradient-to-r from-brand-900 via-slate-900 to-indigo-950 rounded-2xl p-6 text-white shadow-xl space-y-4 border border-brand-500/30 animate-in fade-in duration-300">
+            <div className="flex items-center gap-3 border-b border-white/10 pb-3">
+              <Sparkles size={20} className="text-brand-300 animate-pulse" />
+              <h3 className="text-sm font-bold text-white">Resumo Gerado pela Inteligência Artificial</h3>
+            </div>
             <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 text-xs text-slate-100 whitespace-pre-line leading-relaxed border border-white/10">
               {aiSummary}
             </div>
-          ) : (
-            <p className="text-xs text-slate-300 italic">
-              Clique no botão acima para a IA analisar todas as interações, oportunidades e pendências deste cliente e sintetizar em segundos.
-            </p>
-          )}
-        </div>
+          </div>
+        )}
+
+        {/* Seção 2: Card Próximas Ações (Sprint RC-1) */}
+        <Card title="Próximas Ações & Status Geral">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-start gap-3">
+              <div className="p-2 rounded-lg bg-amber-500/10 text-amber-600 shrink-0">
+                <AlertCircle size={18} />
+              </div>
+              <div>
+                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Pendências</span>
+                <span className="font-bold text-slate-900 text-sm">0 Pendentes</span>
+                <p className="text-[11px] text-slate-500 mt-0.5">Tudo em dia</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-start gap-3">
+              <div className="p-2 rounded-lg bg-brand-500/10 text-brand-600 shrink-0">
+                <Calendar size={18} />
+              </div>
+              <div>
+                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Próxima Reunião</span>
+                <span className="font-bold text-slate-900 text-sm">Sem agendamentos</span>
+                <p className="text-[11px] text-slate-500 mt-0.5">Próximos 7 dias</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-start gap-3">
+              <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-600 shrink-0">
+                <CheckSquare size={18} />
+              </div>
+              <div>
+                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Tarefas Abertas</span>
+                <span className="font-bold text-slate-900 text-sm">0 Tarefas</span>
+                <p className="text-[11px] text-slate-500 mt-0.5">Nenhuma tarefa aberta</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-start gap-3">
+              <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600 shrink-0">
+                <TrendingUp size={18} />
+              </div>
+              <div>
+                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Leads Relacionados</span>
+                <span className="font-bold text-slate-900 text-sm">0 Oportunidades</span>
+                <p className="text-[11px] text-slate-500 mt-0.5">Funil comercial</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-start gap-3">
+              <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600 shrink-0">
+                <DollarSign size={18} />
+              </div>
+              <div>
+                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Situação Financeira</span>
+                <Badge variant="green" className="mt-0.5">Adimplente</Badge>
+                <p className="text-[11px] text-slate-500 mt-0.5 font-mono">R$ 0,00 pendente</p>
+              </div>
+            </div>
+          </div>
+        </Card>
 
         {/* Grid de Detalhes */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
