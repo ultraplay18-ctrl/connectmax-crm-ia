@@ -3,9 +3,10 @@ import React from 'react';
 interface BadgeProps {
   variant?: 'blue' | 'slate' | 'green' | 'amber' | 'red';
   children: React.ReactNode;
+  className?: string;
 }
 
-export const Badge: React.FC<BadgeProps> = ({ variant = 'slate', children }) => {
+export const Badge: React.FC<BadgeProps> = ({ variant = 'slate', children, className = '' }) => {
   const variantClasses = {
     blue: 'bg-brand-500/10 text-brand-600 border-brand-500/20',
     slate: 'bg-slate-100 text-slate-700 border-slate-200',
@@ -15,7 +16,7 @@ export const Badge: React.FC<BadgeProps> = ({ variant = 'slate', children }) => 
   };
 
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${variantClasses[variant]}`}>
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${variantClasses[variant]} ${className}`}>
       {children}
     </span>
   );
